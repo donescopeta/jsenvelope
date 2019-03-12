@@ -1,0 +1,281 @@
+<html>
+	<head>
+		<title>Temperature selectior</title>
+		<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+	<head>
+	<body>
+		<div style="position: relative;">
+			<canvas id="canvas_2" width="600" height="300"
+				 style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+			<canvas id="canvas_1" width="570" height="300"
+				style="position: absolute; left: 30; top: 0; z-index: 2;"></canvas>
+
+		<script type="text/javascript">
+
+var cursorX;
+var cursorY;
+document.onmousemove = function(e){
+    cursorX = e.pageX;
+    cursorY = e.pageY;
+}
+
+$(document).ready(function(){
+	canvas_1=document.getElementById("canvas_1");
+	canvas_2=document.getElementById("canvas_2");
+	context=canvas_1.getContext("2d");
+	context_2=canvas_2.getContext("2d");
+	context_2.font = 'italic 8pt Calibri';
+	PointList=null
+	PointNow=null
+	isDown=false
+	pixelsPerUnit=80
+	pointRange=8
+	edit=null
+	beforeEdit=null
+	width = canvas_1.width;
+	height = canvas_1.height;
+	centerY= height / 2
+	rightMargin=canvas_2.width-width
+	tresholdX = width * 0.9
+	tresholdY = height/2 * 0.9
+	scaleX=1
+	scaleY=1
+	gridRescaleRatio=0.50;
+	gridscaleY=scaleY*gridRescaleRatio;
+	psX=0;
+	psY=0;
+	gridHeight=40
+	ylinesSpace=gridHeight;
+	gridscale= gridRescaleRatio
+	Ybegin=height/2;
+	setInterval(scaleing,300)
+	PointNow={x:0}
+	isScalerX=false
+	scalerX=null
+	isScalerY=false
+	scalerY=null
+});
+
+function scaleing(){
+	if (psX !== 0 && ( isScalerX==false ) ) {
+		scalerX = setInterval(function(){
+			scaleX-=(psX*scaleX)*0.11
+		},22)
+		isScalerX=true
+	} else if ( isScalerX ){ 
+		clearInterval(scalerX)
+		isScalerX=false
+	}
+	if (psY !== 0) { 
+		if ( isScalerY==false )  {
+			scalerY = setInterval(function(){
+				scaleY-=(psY*scaleY)*0.11
+			},22)
+			isScalerY=true
+			gridInit()
+		} else { 
+			clearInterval(scalerY)
+			isScalerY=false
+	
+		}
+		if (scaleY<gridscale) { ylinesSpace=gridHeight/scaleY; gridscale=gridRescaleRatio*scaleY }
+	}
+}
+
+function AddPoint(x,y){
+	var a = {x:x,y:y}
+	var o = a
+	if(PointList === null) {
+		PointList = o
+		o.before={x:0}
+	}
+	else {
+		o.before = PointNow
+		PointNow.after = o
+	}
+	o.after=null
+	PointNow = o
+}
+
+function pointUpload(p,a){
+	a.before=p.before
+	a.after=p
+	p.before.after=a
+	p.before=a
+	return a
+}
+
+function removePoint(a){
+	a.before.after=a.after
+	a.after.before=a.before
+}
+
+function getSeries(){
+	var a = []
+	var point=PointList
+	while ( point !== null ){
+		a.push([point.x,point.y/pixelsPerUnit])
+		point=point.after
+	}
+	return a
+}
+
+function isEdit(issingleclick){
+	issingleclick = (typeof issingleclick !== 'undefined') ?  issingleclick : true;
+	var a = getMousePos()
+	var point=PointList
+	var range=pointRange/scaleX
+	var rangeY=pointRange/scaleY
+	while ( point !== null ){
+		if ( Math.abs(a.x-point.x) < range && ( Math.abs(a.y-point.y) < rangeY ) )
+			return point
+		else if ( issingleclick && ( point.before.x < a.x && ( point.x > a.x ) ) ) 
+			return pointUpload(point,a)
+		point=point.after
+	}
+	return null
+}
+$('#canvas_1').on('mousedown', function(e){
+	if (isDown === false) isDown = true;
+	init()
+});
+
+$('#canvas_1').dblclick(function(e){
+	var a = isEdit(true)
+	if ( a !== null ) removePoint(a)
+})
+// when mouse button is released (note: window, not canvas here)
+$(window).on('mouseup', function(e){
+    if (isDown === true){
+		isDown = false
+		edit = null
+	}
+	psX=0
+	psY=0
+});
+
+// get mouse pos relative to canvas (yours is fine, this is just different)
+function getMousePos() {
+    var rect = canvas_1.getBoundingClientRect();
+    var x = cursorX - rect.left
+    var y = cursorY - rect.top - centerY
+    return {
+	   ax: x,
+	   ay: y,
+        x: x/scaleX,
+        y: y/scaleY
+    };
+}
+
+function init(){
+	edit = isEdit()
+	if ( edit === null )
+		window.requestAnimationFrame(drawNewPoint)
+	else {
+		window.requestAnimationFrame(drawEdit)
+	}
+}
+
+function gridInit(){
+	window.requestAnimationFrame(drawGrid)
+}
+
+function makedot(x, y){
+		x=x*scaleX
+		y=y*scaleY + centerY	
+		context.lineTo(x,y);
+		context.lineWidth = 3;
+		context.stroke();
+		context.lineJoin = 'miter';
+		context.beginPath();
+		/*circle*/
+		context.arc(x, y, 2, 0, 2 * Math.PI, false);
+		context.fillStyle = 'black';
+		context.fill();
+		context.lineWidth = 6;
+		context.strokeStyle = '#000000';
+		context.stroke();
+		context.moveTo(x, y)
+}
+function drawAxis(c){
+	c.beginPath()
+	c.moveTo(rightMargin, centerY)
+	c.lineTo(width,centerY);
+	c.lineWidth = 3;
+	c.stroke();
+	var enline=0
+	var value=0
+	var lim=centerY/(ylinesSpace*scaleY)
+	for (var n=1; n<lim; n++){
+		enline=(ylinesSpace*n)*scaleY
+		value=Math.round(ylinesSpace*n/pixelsPerUnit*10)/10
+      	c.fillText(-value, 2, enline + centerY+4)
+		c.beginPath()
+		c.moveTo(rightMargin, enline + centerY)
+		c.lineTo(width,enline + centerY);
+		c.lineWidth = 0.5;		
+		context.stroke();
+		c.fillText(value, 2,-enline + centerY+4)
+		c.moveTo(rightMargin,-enline + centerY)
+		c.lineTo(width,-enline + centerY);
+		c.lineWidth = 0.5;
+		c.stroke();
+	}
+}
+function drawGrid(){
+	context_2.clearRect(0,0,width,height);
+	drawAxis(context_2)
+	if (isScalerY) window.requestAnimationFrame(drawGrid)
+}
+function drawNewPoint(){
+	context.clearRect(0,0,width,height);
+	//drawAxis()
+	context.beginPath();
+	context.moveTo(0, Ybegin);
+	var point=PointList
+	while ( point !== null ){
+		makedot(point.x,point.y)
+		point=point.after
+	}
+	var a = getMousePos()
+	var x = a.x
+	var y = a.y
+	if ( PointNow !== null )
+		if (x <= PointNow.x) x = PointNow.x
+	makedot(x,y)
+	if (isDown === true){
+	 	if ( (a.ax > tresholdX) ) psX=0.1; else psX=0 ;
+		if ( (Math.abs(a.ay) > tresholdY) ) psY=0.1; else psY=0 ;
+		window.requestAnimationFrame(drawNewPoint);
+	} 
+	else if (x > PointNow.x) AddPoint(x,y);
+}
+
+function drawEdit(){
+	context.clearRect(0,0,width,height)
+	//drawAxis()
+	context.beginPath();
+	context.moveTo(0, Ybegin);
+	if ( edit !== null ){
+		var a = getMousePos()
+		var x = a.x
+		if (x<edit.before.x) x = edit.before.x
+		if ( edit.after !== null && (x>edit.after.x) ) x = edit.after.x  
+		edit.x=x
+		edit.y=a.y
+	}
+	var point=PointList
+	while ( point !== null ){
+		makedot(point.x,point.y)
+		point=point.after
+	}
+	if (isDown === true) {
+		 window.requestAnimationFrame(drawEdit)
+		if ( (a.ax > tresholdX) ) psX=0.1; else psX=0 ;
+		if ( (Math.abs(a.ay) > tresholdY) ) psY=0.1; else psY=0 ;
+	}
+}
+ 
+		</script>
+	</body>
+</html>
