@@ -1,0 +1,57 @@
+<html>
+<head>
+	<title>Dropping rain</title>
+	<meta charset="UTF-8"></meta>
+</head>
+<body>
+	<canvas  id="mycancas" width="500" height="700"></canvas>
+	<script type="text/javascript">
+var canvas = document.getElementById('mycancas')
+var ctx = canvas.getContext('2d');
+var height = canvas.height
+var width = canvas.width
+var dropsAmount=400
+var drops=[]
+
+class Drop {
+	generate(){
+		this.x = Math.random() * canvas.width;
+		this.timeon = new Date().getTime();
+		this.weight = Math.random()
+		this.lenght = 120 - (Math.random()*50);
+		this.vel = 0.5-(this.weight*0.1);
+		this.gravity = 0.00015 + ( this.weight*0.00012/2 )
+		this.begin = height*Math.random()*0.5 + this.lenght
+	}
+	
+	constructor(x, y) {
+		this.generate()
+		this.begin = height*Math.random()*2 + this.lenght
+	}
+	draw(time){
+		var d = time - this.timeon
+		var y =  ( this.gravity * (d^2) + this.vel ) * d - this.begin
+		if(y >= height) this.generate()
+		ctx.beginPath()
+		ctx.moveTo(this.x,y)
+		ctx.lineTo(this.x,this.lenght+y)
+		ctx.lineWidth = 2 + (this.weight*4)
+		ctx.stroke()
+	}
+}
+for (var i = 0; i < dropsAmount; i++)
+	drops[i] = new Drop()
+function animate(){
+	var time = new Date().getTime();
+	ctx.clearRect(0,0,width,height);
+	for (var i = 0; i < dropsAmount; i++)
+		drops[i].draw(time);
+	requestAnimationFrame(animate);
+}
+function init(){
+	requestAnimationFrame(animate);
+}
+init()
+	</script>
+</body>
+</html>
